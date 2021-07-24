@@ -5,20 +5,27 @@
 #include <string.h>
 #include <stdlib.h>
 
-struct gemini_url * gemini_parse_url(const char *s) {
-	int rc;
-	unsigned int len;
+struct gemini_url * gemini_new_url(unsigned int len) {
 	struct gemini_url *url;
 
-	len = strlen(s) + 1;
 	url = malloc(sizeof(struct gemini_url) + len);
 	if (!url) {
 		return NULL;
 	}
 	url->len = len;
 
-	rc = gemini_parse_url_into(s, url);
-	if (rc == 0) {
+	return url;
+}
+
+struct gemini_url * gemini_parse_url(const char *s) {
+	struct gemini_url *url;
+
+	url = gemini_new_url(strlen(s) + 1);
+	if (!url) {
+		return NULL;
+	}
+
+	if (gemini_parse_url_into(s, url) != 0) {
 		return url;
 	}
 
