@@ -8,11 +8,11 @@ struct test {
 	const char *name;
 	const char *in;
 	int         valid;
-	const char *out
+	const char *out;
 };
 
 TESTS {
-	const char *path;
+	char *path;
 	int i;
 	struct test cases[] = {
 		{
