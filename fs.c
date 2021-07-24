@@ -56,7 +56,7 @@ static int s_parse_path(struct _parser *p) {
 	}
 }
 
-char * gemini_fs_resolve(struct gemini_fs *fs, const char *file) {
+char * gemini_fs_resolve(const char *file) {
 	char *path, *p;
 	int deep = 0, parsed;
 	struct _parser parser;

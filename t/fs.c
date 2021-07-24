@@ -78,7 +78,7 @@ TESTS {
 		}
 
 		/* valid case */
-		path = gemini_fs_resolve(NULL, cases[i].in);
+		path = gemini_fs_resolve(cases[i].in);
 		ok(path, "%s '%s' should resolve properly", cases[i].name, cases[i].in);
 		is(path, cases[i].out,
 			"%s '%s' should resolve to '%s'", cases[i].name, cases[i].in, cases[i].out);

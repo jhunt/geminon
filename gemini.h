@@ -79,7 +79,7 @@ struct gemini_fs {
 	const char *root;
 };
 
-char * gemini_fs_resolve(struct gemini_fs *fs, const char *file);
+char * gemini_fs_resolve(const char *file);
 
 struct gemini_server {
 	int          sockfd;
