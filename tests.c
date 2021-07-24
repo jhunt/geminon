@@ -16,12 +16,17 @@ struct test {
 };
 
 TESTS {
-	struct gemini_url *u;
+	struct gemini_url *u, *allocated;
 	int i;
 	struct test cases[] = {
 		{
 			.name = "the empty string",
 			.url  = "",
+			.valid = NOT_VALID,
+		},
+		{
+			.name  = "bare word",
+			.url   = "test",
 			.valid = NOT_VALID,
 		},
 		{
@@ -113,15 +118,22 @@ TESTS {
 	u->len = 8192;
 
 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		/* first we check that we can allocate */
+		allocated = gemini_parse_url(cases[i].url);
+
 		if (cases[i].valid == NOT_VALID) {
 			/* invalid case */
 			ok(gemini_parse_url_into(cases[i].url, u) != 0,
+				"%s '%s' should not parse as a valid Gemini URL", cases[i].name, cases[i].url);
+			ok(!allocated,
 				"%s '%s' should not parse as a valid Gemini URL", cases[i].name, cases[i].url);
 			continue;
 		}
 
 		/* valid case */
 		ok(gemini_parse_url_into(cases[i].url, u) == 0,
+			"%s '%s' should parse as a valid Gemini URL", cases[i].name, cases[i].url);
+		ok(allocated,
 			"%s '%s' should parse as a valid Gemini URL", cases[i].name, cases[i].url);
 		is(u->host, cases[i].host,
 			"%s '%s' should extract the host part", cases[i].name, cases[i].url);

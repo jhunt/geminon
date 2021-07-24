@@ -25,7 +25,7 @@ struct gemini_url * gemini_parse_url(const char *s) {
 		return NULL;
 	}
 
-	if (gemini_parse_url_into(s, url) != 0) {
+	if (gemini_parse_url_into(s, url) == 0) {
 		return url;
 	}
 
