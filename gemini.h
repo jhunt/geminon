@@ -3,6 +3,7 @@
 
 #define GEMINI_DEFAULT_PORT 1964
 #define MAX_GEMINI_REQUEST_SIZE 8192
+#define GEMINI_MAX_PATH         2048
 
 #define GEMINI_FIXME_LISTEN_BACKLOG 1024
 
@@ -73,6 +74,12 @@ int gemini_parse_url_into(const char *s, struct gemini_url *url);
    although a heap allocation / free may still occur. */
 struct gemini_url * gemini_parse_url(const char *s);
 
+
+struct gemini_fs {
+	const char *root;
+};
+
+char * gemini_fs_resolve(struct gemini_fs *fs, const char *file);
 
 struct gemini_server {
 	int          sockfd;

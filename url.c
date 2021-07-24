@@ -1,4 +1,4 @@
-#include "./fsm.c"
+#include "./fsm.url.c"
 #include "./gemini.h"
 
 #include <stddef.h>

@@ -1,6 +1,5 @@
 #include "./ctap.h"
-
-#include "./gemini.h"
+#include "../gemini.h"
 
 #define VALID     1
 #define NOT_VALID 0
@@ -57,6 +56,11 @@ TESTS {
 		{
 			.name  = "non-numeric port",
 			.url   = "gemini://host:19sixty5/",
+			.valid = NOT_VALID,
+		},
+		{
+			.name  = "too-large port",
+			.url   = "gemini://host:65537/",
 			.valid = NOT_VALID,
 		},
 

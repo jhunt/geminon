@@ -1,2 +1,7 @@
-/tests
 /geminon
+
+/coverage.info
+/coverage
+
+/t/url
+/t/fs
