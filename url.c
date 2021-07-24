@@ -7,12 +7,15 @@
 
 struct gemini_url * gemini_parse_url(const char *s) {
 	int rc;
+	unsigned int len;
 	struct gemini_url *url;
 
-	url = malloc(sizeof(struct gemini_url) + strlen(s) + 1);
+	len = strlen(s) + 1;
+	url = malloc(sizeof(struct gemini_url) + len);
 	if (!url) {
 		return NULL;
 	}
+	url->len = len;
 
 	rc = gemini_parse_url_into(s, url);
 	if (rc == 0) {
@@ -24,20 +27,18 @@ struct gemini_url * gemini_parse_url(const char *s) {
 }
 
 int gemini_parse_url_into(const char *s, struct gemini_url *url) {
-	int state, to, port = DEFAULT_GEMINI_PORT;
-	unsigned int n;
+	int state, to, port = GEMINI_DEFAULT_PORT;
 	const char *next;
+	char *fill;
 
 	if (url == NULL) {
 		return -91;
 	}
 
-	for (n = state = 0, next = s; *next; next++) {
-		if (n > url->len) {
+	for (state = 0, fill = url->buf, next = s; *next; next++) {
+		if (fill >= url->buf + url->len) {
 			return -92;
 		}
-
-		url->buf[n] = *next;
 
 		to = STATES[state][*next & 0xff];
 		if (to < 0) {
@@ -46,22 +47,29 @@ int gemini_parse_url_into(const char *s, struct gemini_url *url) {
 
 		switch (state * 100 + to) {
 		case 910: /* 9 -> 10 = start of host */
-			url->host = url->buf + n;
+			url->host = fill;
+			*fill++ = *next;
+			break;
+
+		case 1010: /* 10 -> 10 = more host characters; continue fill */
+			*fill++ = *next;
 			break;
 
 		case 1012: /* 10 -> 12 = end of host (/path variant) */
-			url->buf[n] = '\0';
-			url->path = url->buf+n+1;
+			*fill++ = '\0';
+			url->path = fill;
+			*fill++ = *next;
 			break;
 
 		case 1011: /* 10 -> 11 = end of host (:port variant) */
-			url->buf[n] = '\0';
-			port        = 0;
+			*fill++ = '\0';
+			port = 0;
 			break;
 
 		case 1112: /* 11 -> 12 = end of port, start of path */
-			url->buf[n] = '\0';
-			url->path = url->buf+n+1;
+			url->path = fill;
+		case 1212: /* 12 -> 12 = continuation of path */
+			*fill++ = *next;
 			break;
 
 		case 1111: /* 11 -> 11 = another port digit */
@@ -72,37 +80,15 @@ int gemini_parse_url_into(const char *s, struct gemini_url *url) {
 			break;
 		}
 
-		n++;
 		state = to;
 	}
 
 	url->port = port & 0xffffu;
-	return state == 12 ? 0 : -state;
-}
+	if (state == 12) {
+		*fill = '\0';
+		return 0;
 
-#include <stdio.h>
-#include <stdlib.h>
-
-int main(int argc, char **argv) {
-	int i, rc;
-	struct gemini_url *url;
-
-	url = malloc(sizeof(struct gemini_url) + 1024);
-	if (!url) {
-		fprintf(stderr, "malloc failed\n");
-		return 1;
-	}
-	url->len = 1024;
-
-	for (i = 1; i < argc; i++) {
-		fprintf(stdout, "in: %s\n", argv[i]);
-		rc = gemini_parse_url_into(argv[i], url);
-		fprintf(stdout, "  = %d\n", rc);
-
-		if (rc == 0) {
-			fprintf(stdout, "  > host: %s\n", url->host);
-			fprintf(stdout, "  > port: %d\n", url->port);
-			fprintf(stdout, "  > path: %s\n", url->path);
-		}
+	} else {
+		return -100 - state;
 	}
 }

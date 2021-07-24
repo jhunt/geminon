@@ -1,7 +1,7 @@
 #ifndef __GEMINON_GEMINI_H
 #define __GEMINON_GEMINI_H
 
-#define DEFAULT_GEMINI_PORT 1965
+#define GEMINI_DEFAULT_PORT 1964
 
 struct gemini_url {
 	const char     *host;
