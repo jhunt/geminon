@@ -89,7 +89,14 @@ struct gemini_server {
 	struct gemini_url *url;
 };
 
+/* Bind a socket to the given Gemini URL (path notwithstanding)
+   so that a future call to gemini_serve() can listen and accept
+   connections.  The socket will be set to REUSEADDR, to ensure
+   quick startup of servers post-crash. */
 int gemini_bind(struct gemini_server *server, const char *url);
+
+/* Listen to the socket created by a gemini_bind() against the
+   passed server object, and service clients as they connect. */
 int gemini_serve(struct gemini_server *server);
 
 #endif
