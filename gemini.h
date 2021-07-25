@@ -10,6 +10,10 @@
 #define GEMINI_LISTEN_BACKLOG 1024
 
 #include <sys/types.h>
+#include <openssl/ssl.h>
+
+int gemini_init();
+int gemini_deinit();
 
 /* A gemini_url gives you access to the parsed components
    of a gemini:// uniform resource locator.  Specifically,
@@ -87,6 +91,7 @@ int gemini_fs_open(struct gemini_fs *fs, const char *file, int flags);
 
 struct gemini_request {
 	int  fd;
+	SSL *ssl;
 
 	struct gemini_url *url;
 };
@@ -100,9 +105,10 @@ struct gemini_handler {
 	void                  *data;
 };
 
-
 struct gemini_server {
-	int                sockfd;
+	int      sockfd;
+	SSL_CTX *ssl;
+
 	struct gemini_url *url;
 
 	struct gemini_handler *first, *last;

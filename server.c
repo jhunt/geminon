@@ -11,6 +11,9 @@
 #include <netinet/ip.h>
 #include <fcntl.h>
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 int gemini_handle(struct gemini_server *server, struct gemini_handler *handler) {
 	handler->next = NULL;
 
@@ -113,20 +116,36 @@ int gemini_bind(struct gemini_server *server, const char *url) {
 	return 0;
 }
 
-static ssize_t s_readto(int fd, char *dst, size_t len, const char *end) {
+static ssize_t s_readto(SSL *ssl, char *dst, size_t len, const char *end) {
 	size_t i, j, ntotal = 0, nread;
 
-	while ((nread = read(fd, dst+ntotal, len-1-ntotal)) > 0) {
+	while ((SSL_read_ex(ssl, dst+ntotal, len-1-ntotal, &nread)) == 1) {
 		ntotal += nread;
 		*(dst+ntotal) = '\0';
 		if (strstr(dst, end) != NULL) {
 			return ntotal;
 		}
 	}
-	return nread;
+	return -1;
 }
 
 int gemini_tls(struct gemini_server *server) {
+	server->ssl = SSL_CTX_new(TLS_method());
+	if (!server->ssl) {
+		ERR_print_errors_fp(stderr);
+		return -1;
+	}
+
+	if (SSL_CTX_use_certificate_file(server->ssl, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
+		ERR_print_errors_fp(stderr);
+		return -2;
+	}
+
+	if (SSL_CTX_use_PrivateKey_file(server->ssl, "key.pem", SSL_FILETYPE_PEM) <= 0) {
+		ERR_print_errors_fp(stderr);
+		return -3;
+	}
+
 	return 0;
 }
 
@@ -141,7 +160,14 @@ int gemini_serve(struct gemini_server *server) {
 	while ((req.fd = accept(server->sockfd, NULL, NULL)) != -1) {
 		fprintf(stderr, "[gemini_serve] accepted inbound connection on fd %d\n", req.fd);
 
-		n = s_readto(req.fd, buf, sizeof(buf), "\r\n");
+		req.ssl = SSL_new(server->ssl);
+		SSL_set_fd(req.ssl, req.fd);
+		if (SSL_accept(req.ssl) <= 0) {
+			close(req.fd);
+			continue;
+		}
+
+		n = s_readto(req.ssl, buf, sizeof(buf), "\r\n");
 		if (n <= 0) {
 			fprintf(stderr, "[gemini_serve] received error while reading from connection on fd %d\n", req.fd);
 			gemini_request_close(&req);
@@ -178,6 +204,7 @@ int gemini_serve(struct gemini_server *server) {
 			}
 		}
 		if (!handled) {
+			fprintf(stderr, "[gemini_serve] not handled; trying fallback handler...\n");
 			gemini_request_respond(&req, 51, "Not Found");
 		}
 		gemini_request_close(&req);

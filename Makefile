@@ -1,4 +1,6 @@
-geminon: main.o url.o fs.o server.o request.o
+LDLIBS := -lssl -lcrypto
+
+geminon: main.o init.o url.o fs.o server.o request.o
 	$(CC) -g -Wall -o $@ $+ $(LDLIBS)
 	ldd $@
 

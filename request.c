@@ -21,13 +21,21 @@ int gemini_request_respond(struct gemini_request *req, int status, const char *m
 }
 
 int gemini_request_write(struct gemini_request *req, const void *buf, size_t n) {
-	size_t nwrit;
+	int rc;
+	size_t ntotal, nwrit;
 
-	while ((nwrit = write(req->fd, buf, n)) > 0) {
+	ntotal = 0;
+	while (n > 0) {
+		rc = SSL_write_ex(req->ssl, buf, n, &nwrit);
+		if (rc == 0) {
+			return -1;
+		}
 		n -= nwrit;
 		buf += n;
+		ntotal += nwrit;
 	}
-	return nwrit;
+
+	return ntotal;
 }
 
 int gemini_request_stream(struct gemini_request *req, int fd, size_t block) {
@@ -60,6 +68,12 @@ int gemini_request_stream(struct gemini_request *req, int fd, size_t block) {
 }
 
 void gemini_request_close(struct gemini_request *req) {
+	if (req->ssl) {
+		SSL_shutdown(req->ssl);
+		SSL_free(req->ssl);
+		req->ssl = NULL;
+	}
+
 	if (req->fd >= 0) {
 		close(req->fd);
 		req->fd = -1;
