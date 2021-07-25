@@ -11,7 +11,7 @@ struct test {
 	const char *out;
 };
 
-TESTS {
+static inline void run_resolve_tests() {
 	char *path;
 	int i;
 	struct test cases[] = {
@@ -19,25 +19,25 @@ TESTS {
 			.name  = "absolute path",
 			.in    = "/foo/bar",
 			.valid = VALID,
-			.out   = "/foo/bar",
+			.out   = "foo/bar",
 		},
 		{
 			.name  = "relative path",
 			.in    = "bar/baz",
 			.valid = VALID,
-			.out   = "/bar/baz",
+			.out   = "bar/baz",
 		},
 		{
 			.name  = "dotted up directory",
 			.in    = "/foo/bar/../baz",
 			.valid = VALID,
-			.out   = "/foo/baz",
+			.out   = "foo/baz",
 		},
 		{
 			.name  = "escape attempt",
 			.in    = "/../../../../../../../../etc/shadow",
 			.valid = VALID,
-			.out   = "/etc/shadow",
+			.out   = "etc/shadow",
 		},
 		{
 			.name  = "escape attempt",
@@ -55,19 +55,19 @@ TESTS {
 			.name  = "hidden files",
 			.in    = "/.hidden/file",
 			.valid = VALID,
-			.out   = "/.hidden/file",
+			.out   = ".hidden/file",
 		},
 		{
 			.name  = "hidden files",
 			.in    = "/.hidden/..file",
 			.valid = VALID,
-			.out   = "/.hidden/..file",
+			.out   = ".hidden/..file",
 		},
 		{
 			.name  = "dotted directories",
 			.in    = "/something.d/test",
 			.valid = VALID,
-			.out   = "/something.d/test",
+			.out   = "something.d/test",
 		},
 	};
 
@@ -84,4 +84,31 @@ TESTS {
 			"%s '%s' should resolve to '%s'", cases[i].name, cases[i].in, cases[i].out);
 		free(path);
 	}
+}
+
+static inline void run_open_tests() {
+	int fd;
+	struct gemini_fs fs;
+	char buf[1024];
+	size_t n;
+
+	fs.root = "t/data";
+	fd = gemini_fs_open(&fs, "non/existent/path", O_RDONLY);
+	cmp_ok(fd, "<", 0, "should be unable to open [t/data/]non/existent/path");
+
+	fd = gemini_fs_open(&fs, "foo", O_RDONLY);
+	cmp_ok(fd, "<", 0, "should be unable to open [t/data/]foo (it's a directory!)");
+
+	fd = gemini_fs_open(&fs, "foo/bar/baz/quux", O_RDONLY);
+	cmp_ok(fd, ">=", 0, "should be able to open [t/data/]foo/bar/baz/quux for reading");
+	n = read(fd, buf, sizeof(buf) - 1);
+	cmp_ok(n, ">", 0, "should be able to read at least one byte from [t/data/]foo/bar/baz/quux");
+	if (n < 0) return;
+	buf[n] = '\0';
+	is(buf, "a test file\n", "should be able to read [t/data/]foo/bar/baz/quux via the returned file descriptor");
+}
+
+TESTS {
+	run_resolve_tests();
+	run_open_tests();
 }
