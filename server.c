@@ -10,9 +10,14 @@
 #include <netinet/ip.h>
 #include <fcntl.h>
 
-int gemini_bind(struct gemini_server *server) {
+int gemini_bind(struct gemini_server *server, const char *url) {
 	int fd, rc, v;
 	struct sockaddr_in sa;
+
+	server->url = gemini_parse_url("gemini://localhost:1964/");
+	if (!server->url) {
+		return -1;
+	}
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0) {

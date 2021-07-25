@@ -89,7 +89,7 @@ struct gemini_server {
 	struct gemini_url *url;
 };
 
-int gemini_bind(struct gemini_server *server);
+int gemini_bind(struct gemini_server *server, const char *url);
 int gemini_serve(struct gemini_server *server);
 
 #endif
