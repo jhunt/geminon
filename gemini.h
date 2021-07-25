@@ -7,8 +7,9 @@
 #define GEMINI_MAX_RESPONSE 256
 #define GEMINI_MAX_PATH    2048
 
-#define GEMINI_LISTEN_BACKLOG    1024
-#define GEMINI_IOCOPY_BLOCK_SIZE 8192
+#define GEMINI_LISTEN_BACKLOG 1024
+
+#include <sys/types.h>
 
 /* A gemini_url gives you access to the parsed components
    of a gemini:// uniform resource locator.  Specifically,
@@ -84,7 +85,13 @@ struct gemini_fs {
 char * gemini_fs_resolve(const char *file);
 int gemini_fs_open(struct gemini_fs *fs, const char *file, int flags);
 
-typedef int (*gemini_handler)(int fd, struct gemini_url *, void *);
+struct gemini_request {
+	int  fd;
+
+	struct gemini_url *url;
+};
+
+typedef int (*gemini_handler)(struct gemini_request *, void *);
 
 struct gemini_handler {
 	struct gemini_handler *next;
@@ -93,7 +100,6 @@ struct gemini_handler {
 	void                  *data;
 };
 
-void gemini_response(int fd, int status, const char *meta);
 
 struct gemini_server {
 	int                sockfd;
@@ -101,6 +107,11 @@ struct gemini_server {
 
 	struct gemini_handler *first, *last;
 };
+
+int gemini_request_respond(struct gemini_request *req, int status, const char *meta);
+int gemini_request_write(struct gemini_request *req, const void *buf, size_t n);
+int gemini_request_stream(struct gemini_request *req, int fd, size_t block);
+void gemini_request_close(struct gemini_request *req);
 
 int gemini_handle(struct gemini_server *server, struct gemini_handler *handler);
 int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_handler fn, void *data);
@@ -111,6 +122,8 @@ int gemini_handle_fs(struct gemini_server *server, const char *prefix, const cha
    connections.  The socket will be set to REUSEADDR, to ensure
    quick startup of servers post-crash. */
 int gemini_bind(struct gemini_server *server, const char *url);
+
+int gemini_tls(struct gemini_server *server);
 
 /* Listen to the socket created by a gemini_bind() against the
    passed server object, and service clients as they connect. */

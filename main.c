@@ -5,10 +5,10 @@
 
 #include "./gemini.h"
 
-static int echo_handler(int fd, struct gemini_url *url, void *_) {
-	write(fd, url->path, strlen(url->path));
-	write(fd, "\r\n", 2);
-	close(fd);
+static int echo_handler(struct gemini_request *req, void *_) {
+	gemini_request_write(req, req->url->path, strlen(req->url->path));
+	gemini_request_write(req, "\r\n", 2);
+	gemini_request_close(req);
 	return 0;
 }
 

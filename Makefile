@@ -1,5 +1,6 @@
-geminon: main.o url.o fs.o server.o
-	$(CC) -g -Wall -o $@ $+
+geminon: main.o url.o fs.o server.o request.o
+	$(CC) -g -Wall -o $@ $+ $(LDLIBS)
+	ldd $@
 
 test: t/url t/fs
 	prove -v $+

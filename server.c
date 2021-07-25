@@ -11,21 +11,6 @@
 #include <netinet/ip.h>
 #include <fcntl.h>
 
-void gemini_response(int fd, int status, const char *meta) {
-	char buf[GEMINI_MAX_RESPONSE];
-	memset(buf, 0, sizeof(buf));
-
-	buf[0] = '0' + status / 10 % 10;
-	buf[1] = '0' + status      % 10;
-	buf[2] = ' ';
-
-	strncpy(buf+3, meta, sizeof(buf) - 3 /*   "XX "  */
-	                                 - 2 /*   \r\n   */
-	                                 - 1 /*   \0     */);
-	strcat(buf, "\r\n");
-	write(fd, buf, strlen(buf));
-}
-
 int gemini_handle(struct gemini_server *server, struct gemini_handler *handler) {
 	handler->next = NULL;
 
@@ -51,45 +36,22 @@ int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_ha
 	return gemini_handle(server, handler);
 }
 
-static char iocopy_buf[GEMINI_IOCOPY_BLOCK_SIZE];
-static int s_iocopy(int dstfd, int srcfd) {
-	ssize_t n, nread, nwrit;
-
-	n = 0;
-	while ((nread = read(srcfd, iocopy_buf+n, sizeof(iocopy_buf)-n)) > 0) {
-		n += nread;
-		nwrit = write(dstfd, iocopy_buf, n);
-		if (nwrit < 0) return nwrit;
-		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
-		n -= nwrit;
-	}
-	if (nread < 0) return nread;
-	while (n > 0) {
-		nwrit = write(dstfd, iocopy_buf, n);
-		if (nwrit < 0) return nwrit;
-		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
-		n -= nwrit;
-	}
-}
-
-static int s_handler_fs(int connfd, struct gemini_url *url, void *_fs) {
+static int s_handler_fs(struct gemini_request *req, void *_fs) {
 	struct gemini_fs *fs;
 	int resfd;
 
 	fs = _fs;
-	resfd = gemini_fs_open(fs, url->path, O_RDONLY);
+	resfd = gemini_fs_open(fs, req->url->path, O_RDONLY);
 	if (resfd < 0) {
 		return -1;
 	}
 
-	gemini_response(connfd, 20, "text/plain");
-	if (s_iocopy(connfd, resfd) < 0) {
-		close(resfd);
-		close(connfd);
-		return 0;
+	gemini_request_respond(req, 20, "text/plain");
+	if (gemini_request_stream(req, resfd, 8192) < 0) {/* FIXME magic number */
+		fprintf(stderr, "short write!\n");
 	}
 	close(resfd);
-	close(connfd);
+	gemini_request_close(req);
 	return 0;
 }
 
@@ -161,47 +123,48 @@ static ssize_t s_readto(int fd, char *dst, size_t len, const char *end) {
 			return ntotal;
 		}
 	}
-	return -ntotal;
+	return nread;
+}
+
+int gemini_tls(struct gemini_server *server) {
+	return 0;
 }
 
 int gemini_serve(struct gemini_server *server) {
-	int connfd;
-
+	int handled;
 	ssize_t n;
 	char *p, buf[GEMINI_MAX_REQUEST];
-	struct gemini_url *url;
+	struct gemini_request req;
 	struct gemini_handler *handler;
-	int handled;
 
-	while ((connfd = accept(server->sockfd, NULL, NULL)) != -1) {
-		fprintf(stderr, "[gemini_serve] accepted inbound connection on fd %d\n", connfd);
+	memset(&req, 0, sizeof(req));
+	while ((req.fd = accept(server->sockfd, NULL, NULL)) != -1) {
+		fprintf(stderr, "[gemini_serve] accepted inbound connection on fd %d\n", req.fd);
 
-		n = s_readto(connfd, buf, sizeof(buf), "\r\n");
+		n = s_readto(req.fd, buf, sizeof(buf), "\r\n");
 		if (n <= 0) {
-			fprintf(stderr, "[gemini_serve] received error while reading from connection on fd %d\n", connfd);
-			close(connfd);
+			fprintf(stderr, "[gemini_serve] received error while reading from connection on fd %d\n", req.fd);
+			gemini_request_close(&req);
 			continue;
 		}
-
-		fprintf(stderr, "[gemini_serve] read a total of %ld bytes from connection on fd %d\n", n, connfd);
 
 		p = strstr(buf, "\r\n");
 		assert(p); *p = '\0';
 
 		fprintf(stderr, "[gemini_serve] checking url '%s'\n", buf);
-		url = gemini_parse_url(buf);
-		if (!url) {
+		req.url = gemini_parse_url(buf);
+		if (!req.url) {
 			fprintf(stderr, "[gemini_serve] '%s' is an invalid gemini:// protocol url\n", buf);
-			gemini_response(connfd, 50, "Bad URL");
-			close(connfd);
+			gemini_request_respond(&req, 50, "Bad URL");
+			gemini_request_close(&req);
 			continue;
 		}
 
-		if (strcmp(url->host, server->url->host) != 0 || url->port != server->url->port) {
+		if (strcmp(req.url->host, server->url->host) != 0 || req.url->port != server->url->port) {
 			fprintf(stderr, "[gemini_serve] '%s' is for host '%s:%d' (not '%s:%d')\n",
-				buf, url->host, url->port, server->url->host, server->url->port);
-			gemini_response(connfd, 52, "Misdirected");
-			close(connfd);
+				buf, req.url->host, req.url->port, server->url->host, server->url->port);
+			gemini_request_respond(&req, 52, "Misdirected");
+			gemini_request_close(&req);
 			continue;
 		}
 
@@ -209,15 +172,15 @@ int gemini_serve(struct gemini_server *server) {
 		handled = 0;
 		for (handler = server->first; handler; handler = handler->next) {
 			/* FIXME check for prefix match! */
-			if (handler->handler(connfd, url, handler->data) == 0) {
+			if (handler->handler(&req, handler->data) == 0) {
 				handled = 1;
 				break;
 			}
 		}
 		if (!handled) {
-			gemini_response(connfd, 51, "Not Found");
-			close(connfd);
+			gemini_request_respond(&req, 51, "Not Found");
 		}
+		gemini_request_close(&req);
 	}
 
 	return -1;
