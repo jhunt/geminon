@@ -36,7 +36,7 @@ int gemini_bind(struct gemini_server *server) {
 		return rc;
 	}
 
-	rc = listen(fd, GEMINI_FIXME_LISTEN_BACKLOG);
+	rc = listen(fd, GEMINI_LISTEN_BACKLOG);
 	if (rc < 0) {
 		close(fd);
 		return rc;
@@ -90,7 +90,7 @@ int gemini_serve(struct gemini_server *server) {
 	int connfd, resfd;
 
 	ssize_t n;
-	char *p, buf[MAX_GEMINI_REQUEST_SIZE];
+	char *p, buf[GEMINI_MAX_REQUEST];
 	struct gemini_url *url;
 	struct gemini_fs fs;
 
@@ -102,7 +102,7 @@ int gemini_serve(struct gemini_server *server) {
 	while ((connfd = accept(server->sockfd, NULL, NULL)) != -1) {
 		fprintf(stderr, "[gemini_serve] accepted inbound connection on fd %d\n", connfd);
 
-		n = s_readto(connfd, buf, MAX_GEMINI_REQUEST_SIZE, "\r\n");
+		n = s_readto(connfd, buf, sizeof(buf), "\r\n");
 		if (n <= 0) {
 			fprintf(stderr, "[gemini_serve] received error while reading from connection on fd %d\n", connfd);
 			close(connfd);

@@ -2,11 +2,12 @@
 #define __GEMINON_GEMINI_H
 
 #define GEMINI_DEFAULT_PORT 1964
-#define MAX_GEMINI_REQUEST_SIZE 8192
-#define GEMINI_MAX_PATH         2048
 
-#define GEMINI_FIXME_LISTEN_BACKLOG 1024
-#define GEMINI_IOCOPY_BLOCK_SIZE    8192
+#define GEMINI_MAX_REQUEST 8192
+#define GEMINI_MAX_PATH    2048
+
+#define GEMINI_LISTEN_BACKLOG    1024
+#define GEMINI_IOCOPY_BLOCK_SIZE 8192
 
 /* A gemini_url gives you access to the parsed components
    of a gemini:// uniform resource locator.  Specifically,
