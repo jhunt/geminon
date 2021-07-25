@@ -11,6 +11,21 @@
 #include <netinet/ip.h>
 #include <fcntl.h>
 
+void gemini_response(int fd, int status, const char *meta) {
+	char buf[GEMINI_MAX_RESPONSE];
+	memset(buf, 0, sizeof(buf));
+
+	buf[0] = '0' + status / 10 % 10;
+	buf[1] = '0' + status      % 10;
+	buf[2] = ' ';
+
+	strncpy(buf+3, meta, sizeof(buf) - 3 /*   "XX "  */
+	                                 - 2 /*   \r\n   */
+	                                 - 1 /*   \0     */);
+	strcat(buf, "\r\n");
+	write(fd, buf, strlen(buf));
+}
+
 int gemini_handle(struct gemini_server *server, struct gemini_handler *handler) {
 	handler->next = NULL;
 
@@ -64,16 +79,14 @@ static int s_handler_fs(int connfd, struct gemini_url *url, void *_fs) {
 	fs = _fs;
 	resfd = gemini_fs_open(fs, url->path, O_RDONLY);
 	if (resfd < 0) {
-		write(connfd, "51 Not Found\r\n", 14);
-		close(connfd);
-		return 0;
+		return -1;
 	}
 
-	write(connfd, "20 text/plain\r\n", 15);
+	gemini_response(connfd, 20, "text/plain");
 	if (s_iocopy(connfd, resfd) < 0) {
 		close(resfd);
 		close(connfd);
-		return -1;
+		return 0;
 	}
 	close(resfd);
 	close(connfd);
@@ -179,7 +192,7 @@ int gemini_serve(struct gemini_server *server) {
 		url = gemini_parse_url(buf);
 		if (!url) {
 			fprintf(stderr, "[gemini_serve] '%s' is an invalid gemini:// protocol url\n", buf);
-			write(connfd, "50 Bad URL\r\n", 12);
+			gemini_response(connfd, 50, "Bad URL");
 			close(connfd);
 			continue;
 		}
@@ -187,7 +200,7 @@ int gemini_serve(struct gemini_server *server) {
 		if (strcmp(url->host, server->url->host) != 0 || url->port != server->url->port) {
 			fprintf(stderr, "[gemini_serve] '%s' is for host '%s:%d' (not '%s:%d')\n",
 				buf, url->host, url->port, server->url->host, server->url->port);
-			write(connfd, "52 Misdirected\r\n", 16);
+			gemini_response(connfd, 52, "Misdirected");
 			close(connfd);
 			continue;
 		}
@@ -202,7 +215,7 @@ int gemini_serve(struct gemini_server *server) {
 			}
 		}
 		if (!handled) {
-			write(connfd, "51 Not Found\r\n", 14);
+			gemini_response(connfd, 51, "Not Found");
 			close(connfd);
 		}
 	}

@@ -4,6 +4,7 @@
 #define GEMINI_DEFAULT_PORT 1964
 
 #define GEMINI_MAX_REQUEST 8192
+#define GEMINI_MAX_RESPONSE 256
 #define GEMINI_MAX_PATH    2048
 
 #define GEMINI_LISTEN_BACKLOG    1024
@@ -91,6 +92,8 @@ struct gemini_handler {
 	gemini_handler         handler;
 	void                  *data;
 };
+
+void gemini_response(int fd, int status, const char *meta);
 
 struct gemini_server {
 	int                sockfd;

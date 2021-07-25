@@ -1,8 +1,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "./gemini.h"
+
+static int echo_handler(int fd, struct gemini_url *url, void *_) {
+	write(fd, url->path, strlen(url->path));
+	write(fd, "\r\n", 2);
+	close(fd);
+	return 0;
+}
 
 int main(int argc, char **argv, char **envp) {
 	int rc;
@@ -10,6 +18,12 @@ int main(int argc, char **argv, char **envp) {
 	memset(&server, 0, sizeof(server));
 
 	rc = gemini_handle_fs(&server, "/", "t/data");
+	if (rc != 0) {
+		fprintf(stderr, "gemini_handle_fs() failed! (e%d: %s)\n", errno, strerror(errno));
+		return 2;
+	}
+
+	rc = gemini_handle_fn(&server, "/", echo_handler, NULL);
 	if (rc != 0) {
 		fprintf(stderr, "gemini_handle_fs() failed! (e%d: %s)\n", errno, strerror(errno));
 		return 2;
