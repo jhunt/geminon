@@ -89,7 +89,7 @@ char * gemini_fs_resolve(const char *file) {
 			/* append a slash and the directory component */
 			/* FIXME replace strncats with pointer math */
 			if (deep > 0) {
-				strncat(path, "/", 1);
+				strncat(path, "/", 2);
 			}
 			strncat(path, parser.buf, GEMINI_MAX_PATH - strlen(path));
 			deep++;
