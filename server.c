@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
@@ -9,6 +10,92 @@
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <fcntl.h>
+
+int gemini_handle(struct gemini_server *server, struct gemini_handler *handler) {
+	handler->next = NULL;
+
+	if (!server->first) server->first      = handler;
+	if ( server->last ) server->last->next = handler;
+	server->last = handler;
+
+	return 0;
+}
+
+int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_handler fn, void *data) {
+	struct gemini_handler *handler;
+
+	handler = malloc(sizeof(struct gemini_handler));
+	if (!handler) {
+		return -1;
+	}
+
+	handler->prefix  = prefix;
+	handler->handler = fn;
+	handler->data    = data;
+
+	return gemini_handle(server, handler);
+}
+
+static char iocopy_buf[GEMINI_IOCOPY_BLOCK_SIZE];
+static int s_iocopy(int dstfd, int srcfd) {
+	ssize_t n, nread, nwrit;
+
+	n = 0;
+	while ((nread = read(srcfd, iocopy_buf+n, sizeof(iocopy_buf)-n)) > 0) {
+		n += nread;
+		nwrit = write(dstfd, iocopy_buf, n);
+		if (nwrit < 0) return nwrit;
+		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
+		n -= nwrit;
+	}
+	if (nread < 0) return nread;
+	while (n > 0) {
+		nwrit = write(dstfd, iocopy_buf, n);
+		if (nwrit < 0) return nwrit;
+		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
+		n -= nwrit;
+	}
+}
+
+static int s_handler_fs(int connfd, struct gemini_url *url, void *_fs) {
+	struct gemini_fs *fs;
+	int resfd;
+
+	fs = _fs;
+	resfd = gemini_fs_open(fs, url->path, O_RDONLY);
+	if (resfd < 0) {
+		write(connfd, "51 Not Found\r\n", 14);
+		close(connfd);
+		return 0;
+	}
+
+	write(connfd, "20 text/plain\r\n", 15);
+	if (s_iocopy(connfd, resfd) < 0) {
+		close(resfd);
+		close(connfd);
+		return -1;
+	}
+	close(resfd);
+	close(connfd);
+	return 0;
+}
+
+int gemini_handle_fs(struct gemini_server *server, const char *prefix, const char *root) {
+	struct gemini_fs *fs;
+
+	fs = malloc(sizeof(struct gemini_fs));
+	if (!fs) {
+		return -1;
+	}
+	fs->root = root;
+
+	if (gemini_handle_fn(server, prefix, s_handler_fs, fs) != 0) {
+		free(fs);
+		return -1;
+	}
+
+	return 0;
+}
 
 int gemini_bind(struct gemini_server *server, const char *url) {
 	int fd, rc, v;
@@ -64,39 +151,14 @@ static ssize_t s_readto(int fd, char *dst, size_t len, const char *end) {
 	return -ntotal;
 }
 
-static char iocopy_buf[GEMINI_IOCOPY_BLOCK_SIZE];
-static int s_iocopy(int dstfd, int srcfd) {
-	ssize_t n, nread, nwrit;
-
-	n = 0;
-	while ((nread = read(srcfd, iocopy_buf+n, sizeof(iocopy_buf)-n)) > 0) {
-		n += nread;
-		nwrit = write(dstfd, iocopy_buf, n);
-		if (nwrit < 0) return nwrit;
-		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
-		n -= nwrit;
-	}
-	if (nread < 0) return nread;
-	while (n > 0) {
-		nwrit = write(dstfd, iocopy_buf, n);
-		if (nwrit < 0) return nwrit;
-		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
-		n -= nwrit;
-	}
-}
-
 int gemini_serve(struct gemini_server *server) {
-	int connfd, resfd;
+	int connfd;
 
 	ssize_t n;
 	char *p, buf[GEMINI_MAX_REQUEST];
 	struct gemini_url *url;
-	struct gemini_fs fs;
-
-	fs.root = server->root;
-	if (fs.root == NULL || !*fs.root) {
-		return -1;
-	}
+	struct gemini_handler *handler;
+	int handled;
 
 	while ((connfd = accept(server->sockfd, NULL, NULL)) != -1) {
 		fprintf(stderr, "[gemini_serve] accepted inbound connection on fd %d\n", connfd);
@@ -130,22 +192,20 @@ int gemini_serve(struct gemini_server *server) {
 			continue;
 		}
 
-		fprintf(stderr, "[gemini_serve] fetching '%s'\n", url->path);
-		resfd = gemini_fs_open(&fs, url->path, O_RDONLY);
-		if (resfd < 0) {
-			fprintf(stderr, "[gemini_serve] '%s': not found\n", url->path);
+		/* walk the handlers */
+		handled = 0;
+		for (handler = server->first; handler; handler = handler->next) {
+			/* FIXME check for prefix match! */
+			if (handler->handler(connfd, url, handler->data) == 0) {
+				handled = 1;
+				break;
+			}
+		}
+		if (!handled) {
 			write(connfd, "51 Not Found\r\n", 14);
 			close(connfd);
-			continue;
 		}
-
-		write(connfd, "20 text/plain\r\n", 15);
-		if (s_iocopy(connfd, resfd) < 0) {
-			fprintf(stderr, "[gemini_serve] '%s': failed copying to connected client\n", url->path);
-		}
-		close(resfd);
-
-		fprintf(stderr, "[gemini_serve] closing connection on fd %d\n", connfd);
-		close(connfd);
 	}
+
+	return -1;
 }

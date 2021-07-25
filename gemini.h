@@ -83,11 +83,25 @@ struct gemini_fs {
 char * gemini_fs_resolve(const char *file);
 int gemini_fs_open(struct gemini_fs *fs, const char *file, int flags);
 
+typedef int (*gemini_handler)(int fd, struct gemini_url *, void *);
+
+struct gemini_handler {
+	struct gemini_handler *next;
+	const char            *prefix;
+	gemini_handler         handler;
+	void                  *data;
+};
+
 struct gemini_server {
 	int                sockfd;
-	const char        *root;
 	struct gemini_url *url;
+
+	struct gemini_handler *first, *last;
 };
+
+int gemini_handle(struct gemini_server *server, struct gemini_handler *handler);
+int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_handler fn, void *data);
+int gemini_handle_fs(struct gemini_server *server, const char *prefix, const char *root);
 
 /* Bind a socket to the given Gemini URL (path notwithstanding)
    so that a future call to gemini_serve() can listen and accept
