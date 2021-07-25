@@ -65,27 +65,21 @@ static ssize_t s_readto(int fd, char *dst, size_t len, const char *end) {
 }
 
 static char iocopy_buf[GEMINI_IOCOPY_BLOCK_SIZE];
-static void s_iocopy(int dstfd, int srcfd) {
+static int s_iocopy(int dstfd, int srcfd) {
 	ssize_t n, nread, nwrit;
 
 	n = 0;
 	while ((nread = read(srcfd, iocopy_buf+n, sizeof(iocopy_buf)-n)) > 0) {
 		n += nread;
 		nwrit = write(dstfd, iocopy_buf, n);
-		if (nwrit < 0) {
-			return; /* FIXME signal error */
-		}
+		if (nwrit < 0) return nwrit;
 		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
 		n -= nwrit;
 	}
-	if (nread < 0) {
-		return; /* FIXME signal error */
-	}
+	if (nread < 0) return nread;
 	while (n > 0) {
 		nwrit = write(dstfd, iocopy_buf, n);
-		if (nwrit < 0) {
-			return; /* FIXME signal error */
-		}
+		if (nwrit < 0) return nwrit;
 		memmove(iocopy_buf, iocopy_buf+nwrit, n-nwrit);
 		n -= nwrit;
 	}
@@ -146,7 +140,9 @@ int gemini_serve(struct gemini_server *server) {
 		}
 
 		write(connfd, "20 text/plain\r\n", 15);
-		s_iocopy(connfd, resfd);
+		if (s_iocopy(connfd, resfd) < 0) {
+			fprintf(stderr, "[gemini_serve] '%s': failed copying to connected client\n", url->path);
+		}
 		close(resfd);
 
 		fprintf(stderr, "[gemini_serve] closing connection on fd %d\n", connfd);
