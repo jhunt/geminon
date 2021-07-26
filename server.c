@@ -50,7 +50,7 @@ static int s_handler_fs(struct gemini_request *req, void *_fs) {
 	}
 
 	gemini_request_respond(req, 20, "text/plain");
-	if (gemini_request_stream(req, resfd, 8192) < 0) {/* FIXME magic number */
+	if (gemini_request_stream(req, resfd, GEMINI_STREAM_BLOCK_SIZE) < 0) {
 		fprintf(stderr, "short write!\n");
 	}
 	close(resfd);

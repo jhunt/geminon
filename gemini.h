@@ -10,7 +10,8 @@
 #define GEMINI_MAX_RESPONSE 256
 #define GEMINI_MAX_PATH    2048
 
-#define GEMINI_LISTEN_BACKLOG 1024
+#define GEMINI_LISTEN_BACKLOG    1024
+#define GEMINI_STREAM_BLOCK_SIZE 8192
 
 #include <sys/types.h>
 #include <openssl/ssl.h>
