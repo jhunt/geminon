@@ -16,6 +16,7 @@ static int echo_handler(struct gemini_request *req, void *_) {
 int main(int argc, char **argv, char **envp) {
 	int rc;
 	struct gemini_server server;
+	const struct gemini_url *urls[2];
 	memset(&server, 0, sizeof(server));
 
 	rc = gemini_init();
@@ -31,6 +32,14 @@ int main(int argc, char **argv, char **envp) {
 	}
 
 	rc = gemini_handle_fn(&server, "/", echo_handler, NULL);
+	if (rc != 0) {
+		fprintf(stderr, "gemini_handle_fn() failed! (e%d: %s)\n", errno, strerror(errno));
+		return 2;
+	}
+
+	urls[0] = gemini_parse_url("gemini://127.0.0.1:1964/");
+	urls[1] = gemini_parse_url("gemini://192.168.129.15:1964/");
+	rc = gemini_handle_vhosts(&server, urls, 2);
 	if (rc != 0) {
 		fprintf(stderr, "gemini_handle_fn() failed! (e%d: %s)\n", errno, strerror(errno));
 		return 2;

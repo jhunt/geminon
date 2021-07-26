@@ -75,6 +75,47 @@ int gemini_handle_fs(struct gemini_server *server, const char *prefix, const cha
 	return 0;
 }
 
+struct _vhosts {
+	const struct gemini_url **urls;
+	int n;
+};
+
+static int s_handler_vhosts(struct gemini_request *req, void *_vhosts) {
+	struct _vhosts *vhosts;
+	int i;
+
+	vhosts = _vhosts;
+	for (i = 0; i < vhosts->n; i++) {
+		if (strcmp(vhosts->urls[i]->host,   req->url->host) == 0
+		 &&        vhosts->urls[i]->port == req->url->port) {
+			return GEMINI_HANDLER_CONTINUE;
+		}
+	}
+
+	gemini_request_respond(req, 53, "Not Found");
+	gemini_request_close(req);
+	return GEMINI_HANDLER_DONE;
+}
+
+int gemini_handle_vhosts(struct gemini_server *server, const struct gemini_url **urls, int n) {
+	struct _vhosts *vhosts;
+
+	vhosts = malloc(sizeof(struct _vhosts));
+	if (!vhosts) {
+		return -1;
+	}
+
+	vhosts->urls = urls;
+	vhosts->n = n;
+
+	if (gemini_handle_fn(server, "/", s_handler_vhosts, vhosts) != 0) {
+		free(vhosts);
+		return -1;
+	}
+
+	return 0;
+}
+
 int gemini_bind(struct gemini_server *server, const char *url) {
 	int fd, rc, v;
 	struct sockaddr_in sa;
@@ -182,14 +223,6 @@ int gemini_serve(struct gemini_server *server) {
 		if (!req.url) {
 			fprintf(stderr, "[gemini_serve] '%s' is an invalid gemini:// protocol url\n", buf);
 			gemini_request_respond(&req, 50, "Bad URL");
-			gemini_request_close(&req);
-			continue;
-		}
-
-		if (strcmp(req.url->host, server->url->host) != 0 || req.url->port != server->url->port) {
-			fprintf(stderr, "[gemini_serve] '%s' is for host '%s:%d' (not '%s:%d')\n",
-				buf, req.url->host, req.url->port, server->url->host, server->url->port);
-			gemini_request_respond(&req, 52, "Misdirected");
 			gemini_request_close(&req);
 			continue;
 		}
