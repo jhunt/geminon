@@ -31,7 +31,7 @@ int main(int argc, char **argv, char **envp) {
 		return 2;
 	}
 
-	rc = gemini_handle_fn(&server, "/", echo_handler, NULL);
+	rc = gemini_handle_fn(&server, "/echo/", echo_handler, NULL);
 	if (rc != 0) {
 		fprintf(stderr, "gemini_handle_fn() failed! (e%d: %s)\n", errno, strerror(errno));
 		return 2;

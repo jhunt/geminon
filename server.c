@@ -225,7 +225,13 @@ int gemini_serve(struct gemini_server *server) {
 		/* walk the handlers */
 		handled = 0;
 		for (handler = server->first; handler; handler = handler->next) {
-			/* FIXME check for prefix match! */
+			if (strlen(req.url->path) < strlen(handler->prefix)) {
+				continue;
+			}
+			if (strncmp(req.url->path, handler->prefix, strlen(handler->prefix)) != 0) {
+				continue;
+			}
+
 			if (handler->handler(&req, handler->data) == GEMINI_HANDLER_DONE) {
 				handled = 1;
 				break;
