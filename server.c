@@ -46,7 +46,7 @@ static int s_handler_fs(struct gemini_request *req, void *_fs) {
 	fs = _fs;
 	resfd = gemini_fs_open(fs, req->url->path, O_RDONLY);
 	if (resfd < 0) {
-		return -1;
+		return GEMINI_HANDLER_CONTINUE;
 	}
 
 	gemini_request_respond(req, 20, "text/plain");
@@ -55,7 +55,7 @@ static int s_handler_fs(struct gemini_request *req, void *_fs) {
 	}
 	close(resfd);
 	gemini_request_close(req);
-	return 0;
+	return GEMINI_HANDLER_DONE;
 }
 
 int gemini_handle_fs(struct gemini_server *server, const char *prefix, const char *root) {
@@ -198,7 +198,7 @@ int gemini_serve(struct gemini_server *server) {
 		handled = 0;
 		for (handler = server->first; handler; handler = handler->next) {
 			/* FIXME check for prefix match! */
-			if (handler->handler(&req, handler->data) == 0) {
+			if (handler->handler(&req, handler->data) == GEMINI_HANDLER_DONE) {
 				handled = 1;
 				break;
 			}

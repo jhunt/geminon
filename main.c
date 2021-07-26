@@ -10,7 +10,7 @@ static int echo_handler(struct gemini_request *req, void *_) {
 	gemini_request_write(req, req->url->path, strlen(req->url->path));
 	gemini_request_write(req, "\r\n", 2);
 	gemini_request_close(req);
-	return 0;
+	return GEMINI_HANDLER_DONE;
 }
 
 int main(int argc, char **argv, char **envp) {
