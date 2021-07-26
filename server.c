@@ -165,6 +165,11 @@ static ssize_t s_readto(SSL *ssl, char *dst, size_t len, const char *end) {
 	return -1;
 }
 
+static int _tls_verify(int preverify_ok, X509_STORE_CTX *ctx) {
+	fprintf(stderr, "validating!\n");
+	return 1;
+}
+
 int gemini_tls(struct gemini_server *server, const char *cert, const char *key) {
 	server->ssl = SSL_CTX_new(TLS_method());
 	if (!server->ssl) {
@@ -182,6 +187,7 @@ int gemini_tls(struct gemini_server *server, const char *cert, const char *key) 
 		return -3;
 	}
 
+	SSL_CTX_set_verify(server->ssl, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, _tls_verify);
 	return 0;
 }
 
@@ -191,6 +197,7 @@ int gemini_serve(struct gemini_server *server) {
 	char *p, buf[GEMINI_MAX_REQUEST];
 	struct gemini_request req;
 	struct gemini_handler *handler;
+	X509 *peer;
 
 	memset(&req, 0, sizeof(req));
 	while ((req.fd = accept(server->sockfd, NULL, NULL)) != -1) {
@@ -201,6 +208,12 @@ int gemini_serve(struct gemini_server *server) {
 		if (SSL_accept(req.ssl) <= 0) {
 			close(req.fd);
 			continue;
+		}
+
+		if (peer = SSL_get_peer_certificate(req.ssl)) {
+			fprintf(stderr, "got a cert from client (unverified)\n");
+		} else {
+			fprintf(stderr, "no peer cert found\n");
 		}
 
 		n = s_readto(req.ssl, buf, sizeof(buf), "\r\n");

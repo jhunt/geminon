@@ -19,6 +19,27 @@
 int gemini_init();
 int gemini_deinit();
 
+struct gemini_client {
+	SSL_CTX *ssl;
+};
+
+struct gemini_response {
+	int status;
+
+	int  fd;
+	SSL *ssl;
+
+	struct gemini_url *url;
+};
+
+int gemini_client_tls(struct gemini_client *client, const char *cert, const char *key);
+struct gemini_response * gemini_client_request(struct gemini_client *client, const char *url);
+void gemini_client_free(struct gemini_client *client);
+
+ssize_t gemini_response_read(struct gemini_response *res, void *buf, size_t n);
+int gemini_response_stream(struct gemini_response *res, int fd, size_t block);
+void gemini_response_close(struct gemini_response *res);
+
 /* A gemini_url gives you access to the parsed components
    of a gemini:// uniform resource locator.  Specifically,
    the host, port, and path components can be accessed
@@ -117,7 +138,7 @@ struct gemini_server {
 };
 
 int gemini_request_respond(struct gemini_request *req, int status, const char *meta);
-int gemini_request_write(struct gemini_request *req, const void *buf, size_t n);
+ssize_t gemini_request_write(struct gemini_request *req, const void *buf, size_t n);
 int gemini_request_stream(struct gemini_request *req, int fd, size_t block);
 void gemini_request_close(struct gemini_request *req);
 

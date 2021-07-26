@@ -20,7 +20,7 @@ int gemini_request_respond(struct gemini_request *req, int status, const char *m
 	return gemini_request_write(req, buf, strlen(buf));
 }
 
-int gemini_request_write(struct gemini_request *req, const void *buf, size_t n) {
+ssize_t gemini_request_write(struct gemini_request *req, const void *buf, size_t n) {
 	int rc;
 	size_t ntotal, nwrit;
 
