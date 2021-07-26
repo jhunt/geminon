@@ -133,7 +133,7 @@ int gemini_handle_vhosts(struct gemini_server *server, const struct gemini_url *
    quick startup of servers post-crash. */
 int gemini_bind(struct gemini_server *server, const char *url);
 
-int gemini_tls(struct gemini_server *server);
+int gemini_tls(struct gemini_server *server, const char *cert, const char *key);
 
 /* Listen to the socket created by a gemini_bind() against the
    passed server object, and service clients as they connect. */

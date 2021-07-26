@@ -51,7 +51,7 @@ int main(int argc, char **argv, char **envp) {
 		return 3;
 	}
 
-	rc = gemini_tls(&server);
+	rc = gemini_tls(&server, "cert.pem", "key.pem");
 	if (rc != 0) {
 		fprintf(stderr, "gemini_tls() failed! (e%d: %s)\n", errno, strerror(errno));
 		return 3;

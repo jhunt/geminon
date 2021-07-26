@@ -170,19 +170,19 @@ static ssize_t s_readto(SSL *ssl, char *dst, size_t len, const char *end) {
 	return -1;
 }
 
-int gemini_tls(struct gemini_server *server) {
+int gemini_tls(struct gemini_server *server, const char *cert, const char *key) {
 	server->ssl = SSL_CTX_new(TLS_method());
 	if (!server->ssl) {
 		ERR_print_errors_fp(stderr);
 		return -1;
 	}
 
-	if (SSL_CTX_use_certificate_file(server->ssl, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
+	if (SSL_CTX_use_certificate_file(server->ssl, cert, SSL_FILETYPE_PEM) <= 0) {
 		ERR_print_errors_fp(stderr);
 		return -2;
 	}
 
-	if (SSL_CTX_use_PrivateKey_file(server->ssl, "key.pem", SSL_FILETYPE_PEM) <= 0) {
+	if (SSL_CTX_use_PrivateKey_file(server->ssl, key, SSL_FILETYPE_PEM) <= 0) {
 		ERR_print_errors_fp(stderr);
 		return -3;
 	}
