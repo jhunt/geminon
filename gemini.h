@@ -112,8 +112,6 @@ struct gemini_server {
 	int      sockfd;
 	SSL_CTX *ssl;
 
-	struct gemini_url *url;
-
 	struct gemini_handler *first, *last;
 };
 
@@ -131,7 +129,7 @@ int gemini_handle_vhosts(struct gemini_server *server, const struct gemini_url *
    so that a future call to gemini_serve() can listen and accept
    connections.  The socket will be set to REUSEADDR, to ensure
    quick startup of servers post-crash. */
-int gemini_bind(struct gemini_server *server, const char *url);
+int gemini_bind(struct gemini_server *server, int port);
 
 int gemini_tls(struct gemini_server *server, const char *cert, const char *key);
 

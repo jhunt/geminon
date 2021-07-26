@@ -45,7 +45,7 @@ int main(int argc, char **argv, char **envp) {
 		return 2;
 	}
 
-	rc = gemini_bind(&server, "gemini://localhost:1964/");
+	rc = gemini_bind(&server, 1964);
 	if (rc != 0) {
 		fprintf(stderr, "gemini_bind() failed! (e%d: %s)\n", errno, strerror(errno));
 		return 3;

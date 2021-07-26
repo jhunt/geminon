@@ -116,14 +116,9 @@ int gemini_handle_vhosts(struct gemini_server *server, const struct gemini_url *
 	return 0;
 }
 
-int gemini_bind(struct gemini_server *server, const char *url) {
+int gemini_bind(struct gemini_server *server, int port) {
 	int fd, rc, v;
 	struct sockaddr_in sa;
-
-	server->url = gemini_parse_url("gemini://localhost:1964/");
-	if (!server->url) {
-		return -1;
-	}
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0) {
@@ -138,7 +133,7 @@ int gemini_bind(struct gemini_server *server, const char *url) {
 	}
 
 	sa.sin_family      = AF_INET;
-	sa.sin_port        = htons(server->url->port);
+	sa.sin_port        = htons(port);
 	sa.sin_addr.s_addr = INADDR_ANY;
 
 	rc = bind(fd, (struct sockaddr *)&sa, sizeof(sa));
