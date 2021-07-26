@@ -24,8 +24,10 @@ struct _parser {
 
 static int s_parse_path(struct _parser *p) {
 	int state, to;
+	size_t left;
 	char *fill;
 
+	left = sizeof(p->buf) - 1;
 	for (state = 1, fill = p->buf; *p->src; p->src++) {
 		to = STATES[state][*p->src & 0xff];
 		if (to < 0) {
@@ -46,8 +48,12 @@ static int s_parse_path(struct _parser *p) {
 		case FROM(2,4):
 		case FROM(3,4):
 		case FROM(4,4):
+			if (left == 0) {
+				/* oops.  path component to long for buffer */
+				return PARSED_ERR;
+			}
 			*fill++ = *p->src;
-			// FIXME check bounds on fill access
+			left--;
 			break;
 		}
 

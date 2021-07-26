@@ -11,10 +11,24 @@ struct test {
 	const char *out;
 };
 
+static char too_long[GEMINI_MAX_PATH * 2];
+static const char * path_too_long() {
+	memset(too_long, 0, sizeof(too_long));
+	strcat(too_long, "/foo/");
+	memset(too_long+5, 'a', GEMINI_MAX_PATH + 10);
+	return too_long;
+}
+
 static inline void run_resolve_tests() {
 	char *path;
 	int i;
 	struct test cases[] = {
+		{
+			.name  = "component too long",
+			.in    = path_too_long(),
+			.valid = NOT_VALID,
+		},
+
 		{
 			.name  = "absolute path",
 			.in    = "/foo/bar",
@@ -74,6 +88,8 @@ static inline void run_resolve_tests() {
 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
 		if (cases[i].valid == NOT_VALID) {
 			/* invalid case */
+			path = gemini_fs_resolve(cases[i].in);
+			is_null(path, "%s '%s' should not resolve", cases[i].name, cases[i].in);
 			continue;
 		}
 
