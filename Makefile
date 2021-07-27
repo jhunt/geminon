@@ -3,7 +3,7 @@ CFLAGS := -Wall
 
 default: geminon gurl
 
-geminon: main.o init.o url.o fs.o server.o request.o
+geminon: geminon.o init.o url.o fs.o server.o request.o
 	$(CC) -g -Wall -o $@ $+ $(LDLIBS)
 	ldd $@
 
@@ -26,7 +26,7 @@ fsm.fs.c: fs.pl
 
 clean:
 	rm -f t/*.o *.o geminon fsm.*.c
-	lcov --zerocounters --directory .
+	which lcov >/dev/null 2>&1 && lcov --zerocounters --directory . || true
 	rm -rf coverage/
 
 coverage:
