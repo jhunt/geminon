@@ -153,7 +153,7 @@ int gemini_bind(struct gemini_server *server, int port) {
 }
 
 static ssize_t s_readto(SSL *ssl, char *dst, size_t len, const char *end) {
-	size_t i, j, ntotal = 0, nread;
+	size_t ntotal = 0, nread;
 
 	while ((SSL_read_ex(ssl, dst+ntotal, len-1-ntotal, &nread)) == 1) {
 		ntotal += nread;
@@ -210,7 +210,7 @@ int gemini_serve(struct gemini_server *server) {
 			continue;
 		}
 
-		if (peer = SSL_get_peer_certificate(req.ssl)) {
+		if ((peer = SSL_get_peer_certificate(req.ssl)) != NULL) {
 			fprintf(stderr, "got a cert from client (unverified)\n");
 		} else {
 			fprintf(stderr, "no peer cert found\n");

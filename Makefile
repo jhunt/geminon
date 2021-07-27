@@ -1,4 +1,5 @@
 LDLIBS := -lssl -lcrypto
+CFLAGS := -Wall
 
 default: geminon gurl
 

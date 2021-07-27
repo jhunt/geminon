@@ -39,7 +39,6 @@ struct gemini_response * gemini_client_request(struct gemini_client *client, con
 	int fd, rc;
 	struct gemini_response *res;
 	struct sockaddr_in sa;
-	SSL *ssl;
 
 	rc = inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
 	if (rc != 1) {

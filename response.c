@@ -5,7 +5,6 @@
 #include <stdlib.h>
 
 ssize_t gemini_response_read(struct gemini_response *res, void *buf, size_t n) {
-	int rc;
 	size_t ntotal;
 	int nread;
 
