@@ -76,7 +76,7 @@ int gemini_handle_fs(struct gemini_server *server, const char *prefix, const cha
 }
 
 struct _vhosts {
-	const struct gemini_url **urls;
+	struct gemini_url ** urls;
 	int n;
 };
 
@@ -97,7 +97,7 @@ static int s_handler_vhosts(struct gemini_request *req, void *_vhosts) {
 	return GEMINI_HANDLER_DONE;
 }
 
-int gemini_handle_vhosts(struct gemini_server *server, const struct gemini_url **urls, int n) {
+int gemini_handle_vhosts(struct gemini_server *server, struct gemini_url ** urls, int n) {
 	struct _vhosts *vhosts;
 
 	vhosts = malloc(sizeof(struct _vhosts));

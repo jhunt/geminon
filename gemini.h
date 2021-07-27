@@ -145,7 +145,7 @@ void gemini_request_close(struct gemini_request *req);
 int gemini_handle(struct gemini_server *server, struct gemini_handler *handler);
 int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_handler fn, void *data);
 int gemini_handle_fs(struct gemini_server *server, const char *prefix, const char *root);
-int gemini_handle_vhosts(struct gemini_server *server, const struct gemini_url **urls, int n);
+int gemini_handle_vhosts(struct gemini_server *server, struct gemini_url **urls, int n);
 
 /* Bind a socket to the given Gemini URL (path notwithstanding)
    so that a future call to gemini_serve() can listen and accept
