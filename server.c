@@ -32,7 +32,7 @@ int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_ha
 		return -1;
 	}
 
-	handler->prefix  = prefix;
+	handler->prefix  = strdup(prefix);
 	handler->handler = fn;
 	handler->data    = data;
 
@@ -65,7 +65,7 @@ int gemini_handle_fs(struct gemini_server *server, const char *prefix, const cha
 	if (!fs) {
 		return -1;
 	}
-	fs->root = root;
+	fs->root = strdup(root);
 
 	if (gemini_handle_fn(server, prefix, s_handler_fs, fs) != 0) {
 		free(fs);
