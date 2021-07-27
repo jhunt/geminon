@@ -68,8 +68,9 @@ static int s_parse_path(struct _parser *p) {
 }
 
 char * gemini_fs_resolve(const char *file) {
-	char *path, *p;
+	char *path, *p, *q;
 	int deep = 0;
+	size_t left;
 	struct _parser parser;
 
 	if (file == NULL) {
@@ -92,12 +93,17 @@ char * gemini_fs_resolve(const char *file) {
 			return NULL;
 
 		case PARSED_DIR:
-			/* append a slash and the directory component */
-			/* FIXME replace strncats with pointer math */
+			left = GEMINI_MAX_PATH - strlen(path) - 1;
+
+			for (p = path; *p; p++) ;
 			if (deep > 0) {
-				strncat(path, "/", 2);
+				/* append a slash and the directory component */
+				*p++ = '/';
+				left--;
 			}
-			strncat(path, parser.buf, GEMINI_MAX_PATH - strlen(path));
+			for (q = parser.buf; left; *p++ = *q++, left--)
+				;
+			*p = '\0';
 			deep++;
 			break;
 
