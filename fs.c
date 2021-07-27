@@ -149,7 +149,7 @@ int gemini_fs_open(struct gemini_fs *fs, const char *file, int flags) {
 		return -1;
 	}
 
-	if (st.st_mode & S_IFMT != S_IFREG) {
+	if (!S_ISREG(st.st_mode)) {
 		close(fd);
 		return -1;
 	}
