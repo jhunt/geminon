@@ -28,6 +28,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 	struct gemini_url **vhosts;
 
 	struct option options[] = {
+		{ "echo",            required_argument, NULL, 'E' },
 		{ "static",          required_argument, NULL, 'S' },
 		{ "bind",            required_argument, NULL, 'b' },
 		{ "listen",          required_argument, NULL, 'l' },
@@ -45,11 +46,19 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 
 	while (1) {
 		idx = 0;
-		c = getopt_long(argc, argv, "S:b:l:c:k:", options, &idx);
+		c = getopt_long(argc, argv, "E:S:b:l:c:k:", options, &idx);
 		if (c == -1)
 			break;
 
 		switch (c) {
+			case 'E':
+				rc = gemini_handle_fn(server, optarg, echo_handler, NULL);
+				if (rc != 0) {
+					fprintf(stderr, "unable to register echo handler at '%s': %s (error %d)\n", optarg, strerror(errno), errno);
+					return -1;
+				}
+				break;
+
 			case 'S':
 				s1 = strdup(optarg);
 				s2 = strchr(s1, ':');
