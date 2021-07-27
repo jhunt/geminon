@@ -39,12 +39,12 @@ int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_ha
 	return gemini_handle(server, handler);
 }
 
-static int s_handler_fs(struct gemini_request *req, void *_fs) {
+static int s_handler_fs(const char *prefix, struct gemini_request *req, void *_fs) {
 	struct gemini_fs *fs;
 	int resfd;
 
 	fs = _fs;
-	resfd = gemini_fs_open(fs, req->url->path, O_RDONLY);
+	resfd = gemini_fs_open(fs, req->url->path + strlen(prefix), O_RDONLY);
 	if (resfd < 0) {
 		return GEMINI_HANDLER_CONTINUE;
 	}
@@ -80,7 +80,7 @@ struct _vhosts {
 	int n;
 };
 
-static int s_handler_vhosts(struct gemini_request *req, void *_vhosts) {
+static int s_handler_vhosts(const char *prefix, struct gemini_request *req, void *_vhosts) {
 	struct _vhosts *vhosts;
 	int i;
 
@@ -192,7 +192,7 @@ int gemini_tls(struct gemini_server *server, const char *cert, const char *key) 
 }
 
 int gemini_serve(struct gemini_server *server) {
-	int handled;
+	int rc, handled;
 	ssize_t n;
 	char *p, buf[GEMINI_MAX_REQUEST];
 	struct gemini_request req;
@@ -235,7 +235,6 @@ int gemini_serve(struct gemini_server *server) {
 			continue;
 		}
 
-		/* walk the handlers */
 		handled = 0;
 		for (handler = server->first; handler; handler = handler->next) {
 			if (strlen(req.url->path) < strlen(handler->prefix)) {
@@ -245,16 +244,28 @@ int gemini_serve(struct gemini_server *server) {
 				continue;
 			}
 
-			if (handler->handler(&req, handler->data) == GEMINI_HANDLER_DONE) {
+			rc = handler->handler(handler->prefix, &req, handler->data);
+			if (rc == GEMINI_HANDLER_CONTINUE) {
+				continue;
+			}
+			if (rc == GEMINI_HANDLER_DONE) {
+				handled = 1;
+				break;
+			}
+
+			if (rc == GEMINI_HANDLER_ABORT) {
+				gemini_request_respond(&req, 59, "Internal Error");
+				gemini_request_close(&req);
 				handled = 1;
 				break;
 			}
 		}
+
 		if (!handled) {
 			fprintf(stderr, "[gemini_serve] not handled; trying fallback handler...\n");
 			gemini_request_respond(&req, 51, "Not Found");
+			gemini_request_close(&req);
 		}
-		gemini_request_close(&req);
 	}
 
 	return -1;

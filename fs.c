@@ -156,3 +156,33 @@ int gemini_fs_open(struct gemini_fs *fs, const char *file, int flags) {
 
 	return fd;
 }
+
+char * gemini_fs_path(struct gemini_fs *fs, const char *file) {
+	char *path, *resolved;
+	int l1, l2;
+
+	resolved = gemini_fs_resolve(file);
+	if (!resolved) {
+		return NULL;
+	}
+
+	l1 = strlen(fs->root);
+	l2 = strlen(resolved);
+
+	path = malloc(l1 + 1 + l2 + 1);
+	if (!path) {
+		free(resolved);
+		return NULL;
+	}
+
+	memcpy(path, fs->root, l1);
+
+	while (l1 > 0 && *(path + l1 - 1) == '/') l1--;
+	*(path+l1) = '/'; l1++;
+
+	memcpy(path+l1, resolved, l2);
+	*(path+l1+l2) = '\0';
+
+	free(resolved);
+	return path;
+}

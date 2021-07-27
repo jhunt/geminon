@@ -3,6 +3,7 @@
 
 #define GEMINI_HANDLER_CONTINUE -1
 #define GEMINI_HANDLER_DONE      0
+#define GEMINI_HANDLER_ABORT     1
 
 #define GEMINI_DEFAULT_PORT 1964
 
@@ -113,6 +114,7 @@ struct gemini_fs {
 
 char * gemini_fs_resolve(const char *file);
 int gemini_fs_open(struct gemini_fs *fs, const char *file, int flags);
+char * gemini_fs_path(struct gemini_fs *fs, const char *file);
 
 struct gemini_request {
 	int  fd;
@@ -121,7 +123,7 @@ struct gemini_request {
 	struct gemini_url *url;
 };
 
-typedef int (*gemini_handler)(struct gemini_request *, void *);
+typedef int (*gemini_handler)(const char *prefix, struct gemini_request *, void *);
 
 struct gemini_handler {
 	struct gemini_handler *next;

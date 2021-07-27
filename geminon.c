@@ -3,17 +3,91 @@
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <signal.h>
 
 #include <getopt.h>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include "./gemini.h"
 
-static int echo_handler(struct gemini_request *req, void *_) {
+static int echo_handler(const char *prefix, struct gemini_request *req, void *_) {
 	gemini_request_respond(req, 20, "text/plain");
 	gemini_request_write(req, req->url->path, strlen(req->url->path));
 	gemini_request_write(req, "\r\n", 2);
 	gemini_request_close(req);
 	return GEMINI_HANDLER_DONE;
+}
+
+static int cgi_handler(const char *prefix, struct gemini_request *req, void *_root) {
+	int rc, pfd[2];
+	struct gemini_fs fs;
+	char *prog, **argv, **envp;
+	pid_t kid;
+
+	fs.root = _root;
+	prog = gemini_fs_path(&fs, req->url->path + strlen(prefix));
+	if (!prog) {
+		return GEMINI_HANDLER_ABORT;
+	}
+
+	fprintf(stderr, "executing '%s'...\n", prog);
+	argv = calloc(1, sizeof(char *));
+	if (!argv) {
+		free(prog);
+		return GEMINI_HANDLER_ABORT;
+	}
+	envp = calloc(1, sizeof(char *));
+	if (!envp) {
+		free(prog); free(argv);
+		return GEMINI_HANDLER_ABORT;
+	}
+
+	rc = pipe(pfd);
+	if (rc != 0) {
+		free(prog); free(argv); free(envp);
+		return GEMINI_HANDLER_ABORT;
+	}
+
+	kid = fork();
+	if (kid < 0) {
+		fprintf(stderr, "fork failed: %s (error %d)\n", strerror(errno), errno);
+		free(prog); free(argv); free(envp);
+		return GEMINI_HANDLER_ABORT;
+	}
+
+	if (kid != 0) {
+		fprintf(stderr, "forked child %d\n", (int)kid);
+		/* in parent process; close write end */
+		close(pfd[1]);
+
+		fprintf(stderr, "parent: streaming request from child process...\n");
+		rc = gemini_request_stream(req, pfd[0], 8192);
+		waitpid(kid, NULL, 0);
+		fprintf(stderr, "parent: child process exited.\n");
+
+		free(prog); free(argv); free(envp);
+		if (rc != 0) {
+			return GEMINI_HANDLER_ABORT;
+		}
+		gemini_request_close(req);
+		return GEMINI_HANDLER_DONE;
+
+	} else {
+		/* in child process; close read end */
+		close(pfd[0]);
+
+		/* redirect stdout to the pipe */
+		rc = dup2(pfd[1], 1);
+		if (rc < 0) exit(1);
+		close(pfd[1]);
+
+		fprintf(stderr, "child: execve'ing '%s'...\n", prog);
+		rc = execve(prog, argv, envp);
+		fprintf(stderr, "child: execve returned %d\n", rc);
+		exit(42);
+	}
 }
 
 int configure(struct gemini_server *server, int argc, char **argv, char **envp) {
@@ -31,6 +105,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 
 	struct option options[] = {
 		{ "echo",            required_argument, NULL, 'E' },
+		{ "exec",            required_argument, NULL, 'X' },
 		{ "static",          required_argument, NULL, 'S' },
 		{ "bind",            required_argument, NULL, 'b' },
 		{ "listen",          required_argument, NULL, 'l' },
@@ -67,7 +142,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 	/* then, we try the command line */
 	while (1) {
 		idx = 0;
-		c = getopt_long(argc, argv, "E:S:b:l:c:k:", options, &idx);
+		c = getopt_long(argc, argv, "E:X:S:b:l:c:k:", options, &idx);
 		if (c == -1)
 			break;
 
@@ -79,6 +154,28 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 					fprintf(stderr, "unable to register echo handler at '%s': %s (error %d)\n", optarg, strerror(errno), errno);
 					return -1;
 				}
+				break;
+
+			case 'X':
+				if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
+					fprintf(stderr, "unable to set child signal handler: %s (error %d)\n", strerror(errno), errno);
+					return -1;
+				}
+				s1 = strdup(optarg);
+				s2 = strchr(s1, ':');
+				if (!s2) {
+					fprintf(stderr, "registering exec handler for '/' urls, served from '%s'\n", s1);
+					handlers++;
+					rc = gemini_handle_fn(server, "/", cgi_handler, s1);
+					s1 = NULL; // belongs to gemini now
+
+				} else {
+					*s2++ = '\0';
+					fprintf(stderr, "registering exec handler for '%s' urls, served from '%s'\n", s1, s2);
+					handlers++;
+					rc = gemini_handle_fn(server, s1, cgi_handler, strdup(s2));
+				}
+				free(s1);
 				break;
 
 			case 'S':
