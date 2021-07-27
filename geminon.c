@@ -20,7 +20,9 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 	int rc, c, idx;
 	char *s1, *s2;
 
-	int port = GEMINI_DEFAULT_PORT;
+	int handlers = 0;
+
+	int port = 0;
 
 	char *cert = NULL, *key = NULL;
 
@@ -44,6 +46,25 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 	}
 	cap = 8;
 
+	/* first, we try the environment */
+	cert = getenv("GEMINON_CERTIFICATE");
+	if (cert) cert = strdup(cert);
+
+	key = getenv("GEMINON_PRIVATE_KEY");
+	if (key) key = strdup(key);
+
+	s1 = getenv("GEMINON_PORT");
+	if (s1) {
+		port = 0;
+		for (s2 = s1; *s2; s2++) {
+			if (!isdigit(*s2)) {
+				fprintf(stderr, "GEMINON_PORT=%s: not a valid port number (try GEMINON_PORT=1965)\n", s1);
+				return -1;
+			}
+		}
+	}
+
+	/* then, we try the command line */
 	while (1) {
 		idx = 0;
 		c = getopt_long(argc, argv, "E:S:b:l:c:k:", options, &idx);
@@ -52,6 +73,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 
 		switch (c) {
 			case 'E':
+				handlers++;
 				rc = gemini_handle_fn(server, optarg, echo_handler, NULL);
 				if (rc != 0) {
 					fprintf(stderr, "unable to register echo handler at '%s': %s (error %d)\n", optarg, strerror(errno), errno);
@@ -64,10 +86,12 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 				s2 = strchr(s1, ':');
 				if (!s2) {
 					fprintf(stderr, "registering fs handler for '/' urls, served from '%s'\n", s1);
+					handlers++;
 					rc = gemini_handle_fs(server, "/", s1);
 				} else {
 					*s2++ = '\0';
 					fprintf(stderr, "registering fs handler for '%s' urls, served from '%s'\n", s1, s2);
+					handlers++;
 					rc = gemini_handle_fs(server, s1, s2);
 				}
 				free(s1);
@@ -84,7 +108,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 				vhosts[nvhosts] = gemini_parse_url(optarg);
 				if (!vhosts[nvhosts]) {
 					free(vhosts);
-					fprintf(stderr, "%s: not a valid gemin:// URL\n", optarg);
+					fprintf(stderr, "%s: not a valid gemini:// URL\n", optarg);
 					return -1;
 				}
 				nvhosts++;
@@ -94,8 +118,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 				port = 0;
 				for (s1 = optarg; *s1; s1++) {
 					if (!isdigit(*s1)) {
-						fprintf(stderr, "%s: not a valid port number (try `-l 1965')\n", optarg);
-						fprintf(stderr, "broke at '%s'\n", s1);
+						fprintf(stderr, "-l %s: not a valid port number (try `-l 1965')\n", optarg);
 						return -1;
 					}
 					port = port * 10 + (*s1 - '0');
@@ -114,11 +137,41 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 		}
 	}
 
-	rc = gemini_handle_vhosts(server, vhosts, nvhosts);
-	if (rc != 0) {
+	if (optind < argc) {
+		fprintf(stderr, "extra arguments found: ");
+		while (optind < argc) {
+			fprintf(stderr, "%s ", argv[optind++]);
+		}
+		fprintf(stderr, "\n");
 		return -1;
 	}
 
+	if (!cert && !key) {
+		fprintf(stderr, "you must specify a TLS X.509 certificate and private key via the --tls-certificate=/path and --tls-key=/path options.\n");
+		return -1;
+	}
+	if (!cert) {
+		fprintf(stderr, "you must specify a TLS X.509 certificate via the --tls-certificate=/path option.\n");
+		return -1;
+	}
+	if (!key) {
+		fprintf(stderr, "you must specify a TLS X.509 private key via the --tls-key=/path option.\n");
+		return -1;
+	}
+
+	if (handlers == 0) {
+		fprintf(stderr, "you must specify at least one handler, via the --echo or --static options\n");
+		return -1;
+	}
+
+	if (nvhosts > 0) {
+		rc = gemini_handle_vhosts(server, vhosts, nvhosts);
+		if (rc != 0) {
+			return -1;
+		}
+	}
+
+	port = port ? port : GEMINI_DEFAULT_PORT;
 	rc = gemini_bind(server, port);
 	if (rc != 0) {
 		fprintf(stderr, "unable to listen on *:%d: %s (error %d)\n", port, strerror(errno), errno);
@@ -130,16 +183,12 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 		fprintf(stderr, "tls configuration failed: %s (error %d)\n", strerror(errno), errno);
 		return -1;
 	}
+	printf("loading tls certificate from %s\n", cert);
+	printf("loading tls private key from %s\n", key);
 	free(cert);
 	free(key);
 
-	if (optind < argc) {
-		printf("non-option ARGV-elements: ");
-		while (optind < argc)
-			printf("%s ", argv[optind++]);
-		printf("\n");
-	}
-
+	printf("listening for inbound connections on *:%d\n", port);
 	return 0;
 }
 
