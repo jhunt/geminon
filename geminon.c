@@ -195,6 +195,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 					fprintf(stderr, "gemini_handle_authn() failed! (e%d: %s)\n", errno, strerror(errno));
 					return 1;
 				}
+				free(s1);
 				break;
 
 			case 'E':
@@ -216,8 +217,7 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 				if (!s2) {
 					fprintf(stderr, "registering exec handler for '/' urls, served from '%s'\n", s1);
 					handlers++;
-					rc = gemini_handle_fn(server, "/", cgi_handler, s1);
-					s1 = NULL; // belongs to gemini now
+					rc = gemini_handle_fn(server, "/", cgi_handler, strdup(s1));
 
 				} else {
 					*s2++ = '\0';
@@ -316,6 +316,8 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 		if (rc != 0) {
 			return -1;
 		}
+	} else {
+		free(vhosts);
 	}
 
 	port = port ? port : GEMINI_DEFAULT_PORT;
@@ -360,6 +362,8 @@ int main(int argc, char **argv, char **envp) {
 		fprintf(stderr, "gemini_serve() failed! (e%d: %s)\n", errno, strerror(errno));
 		return 4;
 	}
+
+	gemini_server_close(&server);
 
 	rc = gemini_deinit();
 	if (rc != 0) {

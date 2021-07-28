@@ -40,12 +40,12 @@ int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_ha
 	return gemini_handle(server, handler);
 }
 
-static int s_handler_fs(const char *prefix, struct gemini_request *req, void *_fs) {
-	struct gemini_fs *fs;
+static int s_handler_fs(const char *prefix, struct gemini_request *req, void *_root) {
+	struct gemini_fs fs;
 	int resfd;
 
-	fs = _fs;
-	resfd = gemini_fs_open(fs, req->url->path + strlen(prefix), O_RDONLY);
+	fs.root = _root;
+	resfd = gemini_fs_open(&fs, req->url->path + strlen(prefix), O_RDONLY);
 	if (resfd < 0) {
 		return GEMINI_HANDLER_CONTINUE;
 	}
@@ -60,20 +60,7 @@ static int s_handler_fs(const char *prefix, struct gemini_request *req, void *_f
 }
 
 int gemini_handle_fs(struct gemini_server *server, const char *prefix, const char *root) {
-	struct gemini_fs *fs;
-
-	fs = malloc(sizeof(struct gemini_fs));
-	if (!fs) {
-		return -1;
-	}
-	fs->root = strdup(root);
-
-	if (gemini_handle_fn(server, prefix, s_handler_fs, fs) != 0) {
-		free(fs);
-		return -1;
-	}
-
-	return 0;
+	return gemini_handle_fn(server, prefix, s_handler_fs, strdup(root));
 }
 
 static int s_handler_authn(const char *prefix, struct gemini_request *req, void *_store) {
@@ -108,6 +95,15 @@ struct _vhosts {
 	struct gemini_url ** urls;
 	int n;
 };
+
+static void s_vhosts_free(struct _vhosts *x) {
+	int i;
+	for (i = 0; i < x->n; i++) {
+		free(x->urls[i]);
+	}
+	free(x->urls);
+	free(x);
+}
 
 static int s_handler_vhosts(const char *prefix, struct gemini_request *req, void *_vhosts) {
 	struct _vhosts *vhosts;
@@ -225,6 +221,9 @@ int gemini_serve(struct gemini_server *server) {
 	char *p, buf[GEMINI_MAX_REQUEST];
 	struct gemini_request req;
 	struct gemini_handler *handler;
+#ifdef DIE_AFTER_N
+	size_t doomsday = DIE_AFTER_N;
+#endif
 
 	memset(&req, 0, sizeof(req));
 	while ((req.fd = accept(server->sockfd, NULL, NULL)) != -1) {
@@ -233,6 +232,7 @@ int gemini_serve(struct gemini_server *server) {
 		req.ssl = SSL_new(server->ssl);
 		SSL_set_fd(req.ssl, req.fd);
 		if (SSL_accept(req.ssl) <= 0) {
+			SSL_free(req.ssl);
 			close(req.fd);
 			continue;
 		}
@@ -289,7 +289,32 @@ int gemini_serve(struct gemini_server *server) {
 			gemini_request_respond(&req, 51, "Not Found");
 			gemini_request_close(&req);
 		}
+#ifdef DIE_AFTER_N
+		if (!--doomsday) {
+			return 0;
+		}
+#endif
 	}
 
 	return -1;
+}
+
+void gemini_server_close(struct gemini_server *server) {
+	struct gemini_handler *handler, *next;
+
+	SSL_CTX_free(server->ssl);
+
+	for (handler = server->first; handler; handler = next) {
+		next = handler->next;
+
+		if (handler->handler == s_handler_vhosts) {
+			s_vhosts_free(handler->data);
+		} else if (handler->handler == s_handler_authn) {
+			X509_STORE_free(handler->data);
+		} else {
+			free(handler->data);
+		}
+		free(handler->prefix);
+		free(handler);
+	}
 }

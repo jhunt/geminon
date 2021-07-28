@@ -128,9 +128,10 @@ typedef int (*gemini_handler)(const char *prefix, struct gemini_request *, void 
 
 struct gemini_handler {
 	struct gemini_handler *next;
-	const char            *prefix;
-	gemini_handler         handler;
-	void                  *data;
+
+	char           *prefix;
+	gemini_handler  handler;
+	void           *data;
 };
 
 struct gemini_server {
@@ -162,5 +163,7 @@ int gemini_tls(struct gemini_server *server, const char *cert, const char *key);
 /* Listen to the socket created by a gemini_bind() against the
    passed server object, and service clients as they connect. */
 int gemini_serve(struct gemini_server *server);
+
+void gemini_server_close(struct gemini_server *server);
 
 #endif
