@@ -4,11 +4,11 @@ CFLAGS := -Wall
 default: geminon gurl
 
 geminon: geminon.o init.o url.o fs.o server.o request.o
-	$(CC) -g -Wall -o $@ $+ $(LDLIBS)
+	$(CC) $(LDFLAGS) -g -Wall -o $@ $+ $(LDLIBS)
 	ldd $@
 
 gurl: gurl.c init.o url.o client.o response.o
-	$(CC) -g -Wall -o $@ $+ $(LDLIBS)
+	$(CC) $(LDFLAGS) -g -Wall -o $@ $+ $(LDLIBS)
 	ldd $@
 
 test: t/url t/fs
