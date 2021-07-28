@@ -95,7 +95,7 @@ static int cgi_handler(const char *prefix, struct gemini_request *req, void *_ro
 
 int configure(struct gemini_server *server, int argc, char **argv, char **envp) {
 	int rc, c, idx;
-	char *s1, *s2;
+	char *s1, *s2, *s3, *prefix;
 
 	int handlers = 0;
 
@@ -103,10 +103,14 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 
 	char *cert = NULL, *key = NULL;
 
+	X509_STORE *store;
+	X509_LOOKUP *lookup;
+
 	int nvhosts, cap;
 	struct gemini_url **vhosts;
 
 	struct option options[] = {
+		{ "authn",           required_argument, NULL, 'A' },
 		{ "echo",            required_argument, NULL, 'E' },
 		{ "exec",            required_argument, NULL, 'X' },
 		{ "static",          required_argument, NULL, 'S' },
@@ -145,11 +149,54 @@ int configure(struct gemini_server *server, int argc, char **argv, char **envp) 
 	/* then, we try the command line */
 	while (1) {
 		idx = 0;
-		c = getopt_long(argc, argv, "E:X:S:b:l:c:k:", options, &idx);
+		c = getopt_long(argc, argv, "A:E:X:S:b:l:c:k:", options, &idx);
 		if (c == -1)
 			break;
 
 		switch (c) {
+			case 'A':
+				store = X509_STORE_new();
+				if (!store) {
+					fprintf(stderr, "unable to create X509_store()\n");
+					return 1;
+				}
+
+				lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+				if (!store) {
+					fprintf(stderr, "unable to create x.509 store lookup\n");
+					return 1;
+				}
+
+				s1 = strdup(optarg);
+				s2 = strchr(s1, ':');
+				if (s2) {
+					*s2++ = '\0';
+					prefix = s1;
+				} else {
+					s2 = s1;
+					prefix = "/";
+				}
+
+				for (;;) {
+					s3 = strchr(s2, ',');
+					if (s3) *s3++ = '\0';
+					rc = X509_load_cert_file(lookup, s2, SSL_FILETYPE_PEM);
+					if (rc == 0) {
+						fprintf(stderr, "%s: unable to load certificate authority certificate\n", s2);
+						ERR_print_errors_fp(stderr);
+						return 1;
+					}
+					if (!s3) break;
+					s2 = s3;
+				}
+
+				rc = gemini_handle_authn(server, prefix, store);
+				if (rc != 0) {
+					fprintf(stderr, "gemini_handle_authn() failed! (e%d: %s)\n", errno, strerror(errno));
+					return 1;
+				}
+				break;
+
 			case 'E':
 				handlers++;
 				rc = gemini_handle_fn(server, optarg, echo_handler, NULL);
@@ -303,36 +350,6 @@ int main(int argc, char **argv, char **envp) {
 	}
 
 	memset(&server, 0, sizeof(server));
-	{
-		X509_STORE *store;
-		X509_LOOKUP *lookup;
-
-		store = X509_STORE_new();
-		if (!store) {
-			fprintf(stderr, "unable to create X509_store()\n");
-			return 1;
-		}
-
-		lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
-		if (!store) {
-			fprintf(stderr, "unable to create x.509 store lookup\n");
-			return 1;
-		}
-
-		rc = X509_load_cert_file(lookup, "ca.pem", SSL_FILETYPE_PEM);
-		if (rc == 0) {
-			fprintf(stderr, "unable to load cert file ca.pem\n");
-			ERR_print_errors_fp(stderr);
-			return 1;
-		}
-
-		rc = gemini_handle_authn(&server, "/", store);
-		if (rc != 0) {
-			fprintf(stderr, "gemini_handle_authn() failed! (e%d: %s)\n", errno, strerror(errno));
-			return 1;
-		}
-	}
-
 	rc = configure(&server, argc, argv, envp);
 	if (rc != 0) {
 		return 1;
