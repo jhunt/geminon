@@ -12,6 +12,9 @@
 
 #include "./gemini.h"
 
+#include <openssl/x509_vfy.h>
+#include <openssl/err.h>
+
 static int echo_handler(const char *prefix, struct gemini_request *req, void *_) {
 	gemini_request_respond(req, 20, "text/plain");
 	gemini_request_write(req, req->url->path, strlen(req->url->path));
@@ -300,6 +303,36 @@ int main(int argc, char **argv, char **envp) {
 	}
 
 	memset(&server, 0, sizeof(server));
+	{
+		X509_STORE *store;
+		X509_LOOKUP *lookup;
+
+		store = X509_STORE_new();
+		if (!store) {
+			fprintf(stderr, "unable to create X509_store()\n");
+			return 1;
+		}
+
+		lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+		if (!store) {
+			fprintf(stderr, "unable to create x.509 store lookup\n");
+			return 1;
+		}
+
+		rc = X509_load_cert_file(lookup, "ca.pem", SSL_FILETYPE_PEM);
+		if (rc == 0) {
+			fprintf(stderr, "unable to load cert file ca.pem\n");
+			ERR_print_errors_fp(stderr);
+			return 1;
+		}
+
+		rc = gemini_handle_authn(&server, "/", store);
+		if (rc != 0) {
+			fprintf(stderr, "gemini_handle_authn() failed! (e%d: %s)\n", errno, strerror(errno));
+			return 1;
+		}
+	}
+
 	rc = configure(&server, argc, argv, envp);
 	if (rc != 0) {
 		return 1;

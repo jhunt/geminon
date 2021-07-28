@@ -12,6 +12,7 @@
 #include <fcntl.h>
 
 #include <openssl/ssl.h>
+#include <openssl/x509.h>
 #include <openssl/err.h>
 
 int gemini_handle(struct gemini_server *server, struct gemini_handler *handler) {
@@ -73,6 +74,34 @@ int gemini_handle_fs(struct gemini_server *server, const char *prefix, const cha
 	}
 
 	return 0;
+}
+
+static int s_handler_authn(const char *prefix, struct gemini_request *req, void *_store) {
+	X509_STORE *store;
+	X509_STORE_CTX *ctx;
+
+	if (!req->cert) {
+		gemini_request_respond(req, 60, "Certificate Required");
+		gemini_request_close(req);
+		return GEMINI_HANDLER_DONE;
+	}
+
+	store = _store;
+	ctx = X509_STORE_CTX_new();
+	X509_STORE_CTX_init(ctx, store, req->cert, NULL);
+
+	if (X509_verify_cert(ctx) != 1) {
+		ERR_print_errors_fp(stderr);
+		gemini_request_respond(req, 61, "Unauthorized");
+		gemini_request_close(req);
+		return GEMINI_HANDLER_DONE;
+	}
+
+	return GEMINI_HANDLER_CONTINUE;
+}
+
+int gemini_handle_authn(struct gemini_server *server, const char *prefix, X509_STORE *store) {
+	return gemini_handle_fn(server, prefix, s_handler_authn, store);
 }
 
 struct _vhosts {
@@ -166,7 +195,6 @@ static ssize_t s_readto(SSL *ssl, char *dst, size_t len, const char *end) {
 }
 
 static int _tls_verify(int preverify_ok, X509_STORE_CTX *ctx) {
-	fprintf(stderr, "validating!\n");
 	return 1;
 }
 
@@ -197,7 +225,6 @@ int gemini_serve(struct gemini_server *server) {
 	char *p, buf[GEMINI_MAX_REQUEST];
 	struct gemini_request req;
 	struct gemini_handler *handler;
-	X509 *peer;
 
 	memset(&req, 0, sizeof(req));
 	while ((req.fd = accept(server->sockfd, NULL, NULL)) != -1) {
@@ -210,11 +237,7 @@ int gemini_serve(struct gemini_server *server) {
 			continue;
 		}
 
-		if ((peer = SSL_get_peer_certificate(req.ssl)) != NULL) {
-			fprintf(stderr, "got a cert from client (unverified)\n");
-		} else {
-			fprintf(stderr, "no peer cert found\n");
-		}
+		req.cert = SSL_get_peer_certificate(req.ssl);
 
 		n = s_readto(req.ssl, buf, sizeof(buf), "\r\n");
 		if (n <= 0) {

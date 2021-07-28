@@ -119,6 +119,7 @@ char * gemini_fs_path(struct gemini_fs *fs, const char *file);
 struct gemini_request {
 	int  fd;
 	SSL *ssl;
+	X509 *cert;
 
 	struct gemini_url *url;
 };
@@ -147,6 +148,7 @@ void gemini_request_close(struct gemini_request *req);
 int gemini_handle(struct gemini_server *server, struct gemini_handler *handler);
 int gemini_handle_fn(struct gemini_server *server, const char *prefix, gemini_handler fn, void *data);
 int gemini_handle_fs(struct gemini_server *server, const char *prefix, const char *root);
+int gemini_handle_authn(struct gemini_server *server, const char *prefix, X509_STORE *store);
 int gemini_handle_vhosts(struct gemini_server *server, struct gemini_url **urls, int n);
 
 /* Bind a socket to the given Gemini URL (path notwithstanding)
