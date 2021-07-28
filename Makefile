@@ -1,7 +1,15 @@
 LDLIBS := -lssl -lcrypto
 CFLAGS := -Wall
 
+IMAGE_PREFIX ?= iamjameshunt/
+
 default: geminon gurl
+
+docker:
+	docker build -t $(IMAGE_PREFIX)geminon:latest .
+	docker build -t $(IMAGE_PREFIX)gurl:latest -f Dockerfile.gurl .
+push:
+	docker push $(IMAGE_PREFIX)geminon:latest $(IMAGE_PREFIX)gurl:latest
 
 geminon: geminon.o init.o url.o fs.o server.o request.o
 	$(CC) $(LDFLAGS) -g -Wall -o $@ $+ $(LDLIBS)

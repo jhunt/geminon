@@ -1,0 +1,11 @@
+FROM alpine:3 AS build
+RUN apk add alpine-sdk openssl-dev
+
+WORKDIR /build
+COPY . .
+
+RUN make default
+
+FROM alpine:3
+COPY --from=build /build/gurl /usr/bin/gurl
+ENTRYPOINT ["/usr/bin/gurl"]
