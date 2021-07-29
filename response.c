@@ -62,9 +62,4 @@ void gemini_response_close(struct gemini_response *res) {
 		close(res->fd);
 		res->fd = -1;
 	}
-
-	if (res->url) {
-		free(res->url);
-		res->url = NULL;
-	}
 }

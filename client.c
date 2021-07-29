@@ -127,5 +127,11 @@ struct gemini_response * gemini_client_request(struct gemini_client *client, con
 	return res;
 }
 
-void gemini_client_free(struct gemini_client *client) {
+void gemini_client_close(struct gemini_client *client) {
+	if (!client)  return;
+
+	if (client->ssl) {
+		SSL_CTX_free(client->ssl);
+		client->ssl = NULL;
+	}
 }
