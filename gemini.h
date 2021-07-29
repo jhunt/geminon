@@ -138,6 +138,9 @@ struct gemini_server {
 	int      sockfd;
 	SSL_CTX *ssl;
 
+	unsigned int requests;
+	unsigned int max_requests;
+
 	struct gemini_handler *first, *last;
 };
 

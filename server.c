@@ -221,9 +221,6 @@ int gemini_serve(struct gemini_server *server) {
 	char *p, buf[GEMINI_MAX_REQUEST];
 	struct gemini_request req;
 	struct gemini_handler *handler;
-#ifdef DIE_AFTER_N
-	size_t doomsday = DIE_AFTER_N;
-#endif
 
 	memset(&req, 0, sizeof(req));
 	while ((req.fd = accept(server->sockfd, NULL, NULL)) != -1) {
@@ -289,11 +286,11 @@ int gemini_serve(struct gemini_server *server) {
 			gemini_request_respond(&req, 51, "Not Found");
 			gemini_request_close(&req);
 		}
-#ifdef DIE_AFTER_N
-		if (!--doomsday) {
+
+		server->requests++;
+		if (server->max_requests > 0 && server->requests > server->max_requests) {
 			return 0;
 		}
-#endif
 	}
 
 	return -1;

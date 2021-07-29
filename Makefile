@@ -1,6 +1,8 @@
 LDLIBS := -lssl -lcrypto
 CFLAGS := -Wall
 
+AFL_CC ?= afl-clang
+
 IMAGE_PREFIX ?= iamjameshunt/
 
 default: geminon gurl
@@ -19,21 +21,37 @@ gurl: gurl.c init.o url.o client.o response.o
 	$(CC) $(LDFLAGS) -g -Wall -o $@ $+ $(LDLIBS)
 	ldd $@
 
+fuzz-url: fuzz-url.fo url.fo
+	$(AFL_CC) $(LDFLAGS) -g -Wall -o $@ $+
+
+run-fuzz-url:
+	afl-fuzz -i fuzzing/url/in -o fuzzing/url/findings -- ./fuzz-url
+
+# I usually just run tmux with ~8 open panes, running `make fuzzer$N`
+fuzzer01:
+	afl-fuzz -i fuzzing/url/in -o fuzzing/url/findings -M $@ -- ./fuzz-url
+fuzzer%:
+	afl-fuzz -i fuzzing/url/in -o fuzzing/url/findings -S $@ -- ./fuzz-url
+
 test: t/url t/fs
 	prove -v $+
 t/url: t/url.o url.o
 t/fs:  t/fs.o  fs.o
 
-url.o: url.c fsm.url.c
+url.c: fsm.url.c
 fsm.url.c: url.pl
 	./url.pl > $@
 
-fs.o: fs.c fsm.fs.c
+fs.c: fsm.fs.c
 fsm.fs.c: fs.pl
 	./fs.pl > $@
 
+%.fo: %.c
+	$(AFL_CC) $(CFLAGS) -o $@ -c $+
+
 clean:
 	rm -f t/*.o *.o geminon fsm.*.c
+	rm -f *.fo fuzz-url
 	which lcov >/dev/null 2>&1 && lcov --zerocounters --directory . || true
 	rm -rf coverage/
 

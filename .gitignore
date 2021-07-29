@@ -6,3 +6,6 @@
 
 /t/url
 /t/fs
+
+/fuzz-url
+/*.fo
